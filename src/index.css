@@ -1,0 +1,242 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Cormorant Garamond", Georgia, Cambria, "Times New Roman", serif;
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  
+  --color-obsidian-950: #0a0908;
+  --color-obsidian-900: #12100e;
+  --color-obsidian-800: #1a1715;
+  --color-obsidian-700: #26221f;
+
+  --color-gold-50: #fbf9f2;
+  --color-gold-100: #f6f0dd;
+  --color-gold-200: #eddfba;
+  --color-gold-300: #dfc88b;
+  --color-gold-400: #d4b35f;
+  --color-gold-500: #c49d3e;
+  --color-gold-600: #a7802f;
+  --color-gold-700: #846127;
+  
+  --color-ivory-50: #fcfbf9;
+  --color-ivory-100: #f7f4ee;
+  --color-ivory-200: #f0eae0;
+  --color-ivory-300: #e4dbc9;
+
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+  --radius-4xl: 0px;
+  --radius-full: 0px;
+  --radius: 0px;
+}
+
+/* Sharp Haute Joaillerie Architectural Aesthetic — 0 Border Radius for every box, card, button, modal, drawer, and input */
+*,
+*::before,
+*::after {
+  border-radius: 0px !important;
+}
+
+/* Trending Products Card Styles — Matching reference screenshot component design */
+.trend-card-box {
+  border-radius: 20px !important;
+}
+
+.trend-action-btn {
+  border-radius: 12px !important;
+}
+
+.trend-cart-btn {
+  border-radius: 8px !important;
+}
+
+.blog-card-img {
+  border-radius: 16px !important;
+}
+
+.carousel-dot {
+  border-radius: 9999px !important;
+}
+
+.carousel-nav-btn {
+  border-radius: 9999px !important;
+}
+
+/* Custom Luxury Scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: #f7f4ee;
+}
+::-webkit-scrollbar-thumb {
+  background: #d4b35f;
+  border-radius: 0px !important;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #c49d3e;
+}
+
+/* Glassmorphism and Grain helpers */
+.glass-dark {
+  background: rgba(18, 16, 14, 0.78);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(212, 179, 95, 0.15);
+}
+
+.glass-light {
+  background: rgba(252, 251, 249, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(228, 219, 201, 0.6);
+}
+
+/* Text glow */
+.gold-glow {
+  text-shadow: 0 0 24px rgba(212, 179, 95, 0.35);
+}
+
+.gold-gradient-text {
+  background: linear-gradient(135deg, #f5eedb 0%, #d4b35f 50%, #eddcb4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gold-gradient-bg {
+  background: linear-gradient(135deg, #c49d3e 0%, #dfc88b 50%, #a7802f 100%);
+}
+
+/* Infinite Marquee Animation for Ticker */
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 25s linear infinite;
+  will-change: transform;
+}
+
+/* Ambient Arabesque Lantern & Atelier Backdrop Animations */
+@keyframes ambient-zoom {
+  0% {
+    transform: scale(1.02) translateY(0);
+  }
+  50% {
+    transform: scale(1.07) translateY(-8px);
+  }
+  100% {
+    transform: scale(1.02) translateY(0);
+  }
+}
+
+.animate-ambient-zoom {
+  animation: ambient-zoom 18s ease-in-out infinite;
+  will-change: transform;
+}
+
+@keyframes lantern-flicker-1 {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(0.98);
+    filter: drop-shadow(0 0 16px rgba(251, 191, 36, 0.4));
+  }
+  25% {
+    opacity: 0.95;
+    transform: scale(1.08);
+    filter: drop-shadow(0 0 35px rgba(245, 158, 11, 0.7));
+  }
+  50% {
+    opacity: 0.68;
+    transform: scale(0.97);
+    filter: drop-shadow(0 0 20px rgba(251, 191, 36, 0.45));
+  }
+  75% {
+    opacity: 0.9;
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 30px rgba(245, 158, 11, 0.65));
+  }
+}
+
+.animate-lantern-1 {
+  animation: lantern-flicker-1 4.2s ease-in-out infinite;
+  will-change: opacity, transform, filter;
+}
+
+@keyframes lantern-flicker-2 {
+  0%, 100% {
+    opacity: 0.65;
+    transform: scale(1);
+    filter: drop-shadow(0 0 20px rgba(245, 158, 11, 0.45));
+  }
+  35% {
+    opacity: 0.98;
+    transform: scale(1.09);
+    filter: drop-shadow(0 0 38px rgba(251, 191, 36, 0.75));
+  }
+  65% {
+    opacity: 0.58;
+    transform: scale(0.96);
+    filter: drop-shadow(0 0 16px rgba(245, 158, 11, 0.4));
+  }
+  85% {
+    opacity: 0.88;
+    transform: scale(1.04);
+    filter: drop-shadow(0 0 28px rgba(251, 191, 36, 0.6));
+  }
+}
+
+.animate-lantern-2 {
+  animation: lantern-flicker-2 5.6s ease-in-out infinite 0.8s;
+  will-change: opacity, transform, filter;
+}
+
+@keyframes sparkle-twinkle {
+  0%, 100% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.5);
+  }
+  50% {
+    opacity: 0.85;
+    transform: translateY(-8px) scale(1.2);
+  }
+}
+
+.animate-sparkle-1 {
+  animation: sparkle-twinkle 4s ease-in-out infinite;
+}
+
+.animate-sparkle-2 {
+  animation: sparkle-twinkle 5.2s ease-in-out infinite 1.4s;
+}
+
+.animate-sparkle-3 {
+  animation: sparkle-twinkle 4.6s ease-in-out infinite 2.6s;
+}
+
+.animate-sparkle-4 {
+  animation: sparkle-twinkle 6.2s ease-in-out infinite 0.7s;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

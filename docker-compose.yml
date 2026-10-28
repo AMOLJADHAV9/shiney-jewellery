@@ -1,0 +1,88 @@
+services:
+  # =============================================================================
+  # 1. POSTGRESQL 16 (Primary Relational Database)
+  # =============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: shiney_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: shiney_db
+      POSTGRES_USER: shiney_admin
+      POSTGRES_PASSWORD: shiney_luxury_secure_pass!
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./backend/database/seeds.sql:/docker-entrypoint-initdb.d/02-seeds.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shiney_admin -d shiney_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # 2. MINIO OBJECT STORAGE (S3-Compatible High-Res Media & Document Store)
+  # =============================================================================
+  minio:
+    image: minio/minio:latest
+    container_name: shiney_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123!
+      MINIO_BROWSER_REDIRECT_URL: http://localhost:9001
+    ports:
+      - "9000:9000" # MinIO S3 API Endpoint
+      - "9001:9001" # MinIO Web Console UI
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Auto-provision MinIO buckets upon boot
+  minio-init:
+    image: minio/mc:latest
+    container_name: shiney_minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set local http://minio:9000 minioadmin minioadmin123!;
+      /usr/bin/mc mb --ignore-existing local/shiney-public-media;
+      /usr/bin/mc mb --ignore-existing local/shiney-secure-documents;
+      /usr/bin/mc mb --ignore-existing local/shiney-user-uploads;
+      /usr/bin/mc mb --ignore-existing local/shiney-backups;
+      /usr/bin/mc anonymous set download local/shiney-public-media;
+      echo 'MinIO buckets initialized successfully!';
+      exit 0;
+      "
+
+  # =============================================================================
+  # 3. REDIS 7 (High-Speed Cache, Cart Cache & Rate Limiting)
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: shiney_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    command: redis-server --appendonly yes --requirepass shiney_redis_secret!
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "shiney_redis_secret!", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  miniodata:
+  redisdata:
