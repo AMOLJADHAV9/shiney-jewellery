@@ -5,7 +5,7 @@ import {
   Clock, Truck, Sparkles, RefreshCw, AlertCircle, Eye, ChevronRight, 
   ChevronDown, Lock, FolderTree, AlertTriangle, Download, Search, 
   Filter, Layers, ArrowUpRight, ArrowDownRight, X, FileSpreadsheet,
-  Check, Info, Image, Star, ArrowLeft, ArrowRight, QrCode, FileText
+  Check, Info, Image, Star, ArrowLeft, ArrowRight, QrCode, FileText, Camera
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
