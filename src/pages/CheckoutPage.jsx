@@ -194,11 +194,27 @@ export default function CheckoutPage() {
         shippingPostalCode: shippingData.postalCode,
         shippingCountry: shippingData.country,
         specialDeliveryNotes: 'Armoured courier signature required upon arrival',
+        paymentMethod: paymentMethod === 'cod' ? 'cash_on_delivery' : paymentMethod,
+        carrierName: "Brink's Armoured Courier",
         items: orderItems,
       });
 
       // Step 2: Handle Payment
-      if (paymentMethod === 'razorpay') {
+      if (paymentMethod === 'cod') {
+        // Cash on Delivery: Order is automatically confirmed on backend with assigned carrier
+        setOrderId(orderResponse.orderNumber);
+        setPlacedOrderSummary({
+          ...orderResponse,
+          status: 'confirmed',
+          carrierName: orderResponse.carrierName || "Brink's Armoured Courier",
+          trackingNumber: orderResponse.trackingNumber,
+          paymentMethod: 'cash_on_delivery',
+        });
+        setOrderConfirmed(true);
+        clearCart();
+        setIsProcessingOrder(false);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else if (paymentMethod === 'razorpay') {
         // Create Razorpay Order on server
         const razorpayData = await api.payments.createRazorpayOrder(orderResponse.orderId);
 
@@ -389,9 +405,40 @@ export default function CheckoutPage() {
               Your acquisition has been recorded and authorized. An insured dispatch notice with armored courier tracking credentials and physical Certificate of Authenticity will be dispatched to <strong>{shippingData.email}</strong>.
             </p>
 
-            <div className="p-5 bg-[#F6F0DD]/60 rounded-none border border-[#EDDFBA] text-left text-xs space-y-2 text-stone-700">
+            <div className="p-5 bg-[#F6F0DD]/60 rounded-none border border-[#EDDFBA] text-left text-xs space-y-2.5 text-stone-700">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-3 border-b border-[#EDDFBA]">
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold block">Order Status</span>
+                  <div className="text-emerald-800 font-semibold text-xs flex items-center space-x-1.5 mt-0.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>Confirmed • Ready for Atelier Crafting</span>
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase tracking-wider text-stone-500 font-semibold block">Designated Armoured Carrier</span>
+                  <div className="text-stone-900 font-medium text-xs flex items-center space-x-1.5 mt-0.5">
+                    <Truck className="w-4 h-4 text-[#C49D3E]" />
+                    <span>{placedOrderSummary?.carrierName || "Brink's Armoured Courier"}</span>
+                  </div>
+                </div>
+              </div>
+
+              {placedOrderSummary?.trackingNumber && (
+                <p>
+                  <strong>Armoured Courier Tracking:</strong>{' '}
+                  <span className="font-mono text-stone-900 bg-white px-2 py-0.5 border border-stone-200">
+                    {placedOrderSummary.trackingNumber}
+                  </span>
+                </p>
+              )}
+
               <p><strong>Insured Delivery Address:</strong> {shippingData.address}, {shippingData.city}, {shippingData.postalCode}</p>
-              <p><strong>Total Amount Settled:</strong> ${total.toLocaleString()} USD</p>
+              <p>
+                <strong>Total Amount:</strong> ${total.toLocaleString()} USD{' '}
+                <span className="text-stone-600 font-medium">
+                  ({placedOrderSummary?.paymentMethod === 'cash_on_delivery' || paymentMethod === 'cod' ? 'Cash on Delivery — Payable upon Hand Delivery' : 'Settled via Razorpay'})
+                </span>
+              </p>
               {placedOrderSummary?.razorpayPaymentId && (
                 <div className="p-2.5 bg-emerald-100/70 border border-emerald-300 text-emerald-950 rounded-none font-mono text-[11px] flex items-center justify-between">
                   <span>Razorpay Payment ID: <strong>{placedOrderSummary.razorpayPaymentId}</strong></span>
@@ -809,6 +856,37 @@ export default function CheckoutPage() {
                       <span className="text-xs font-semibold text-[#846127] shrink-0">Recommended</span>
                     </label>
 
+                    {/* Cash on Delivery (COD) */}
+                    <label className={`flex items-start justify-between p-4 rounded-none border cursor-pointer transition-all ${
+                      paymentMethod === 'cod' ? 'border-[#C49D3E] bg-[#F6F0DD]/30 ring-1 ring-[#C49D3E]' : 'border-stone-200 bg-white hover:border-stone-300'
+                    }`}>
+                      <div className="flex items-start space-x-3.5">
+                        <input
+                          type="radio"
+                          name="payment"
+                          checked={paymentMethod === 'cod'}
+                          onChange={() => setPaymentMethod('cod')}
+                          className="text-[#C49D3E] mt-1"
+                        />
+                        <div className="w-8 h-8 rounded-none bg-[#12100E] text-[#EDDFBA] flex items-center justify-center shrink-0">
+                          <Truck className="w-4 h-4 text-[#C49D3E]" />
+                        </div>
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <p className="text-xs font-semibold text-stone-900">Cash on Delivery (COD)</p>
+                            <span className="text-[10px] text-emerald-800 bg-emerald-100 px-2 py-0.5 font-medium">Auto-Confirmed • Armoured Courier</span>
+                          </div>
+                          <p className="text-[11px] text-stone-600 font-light mt-0.5">
+                            Pay with cash or bank draft upon private armoured courier delivery with identity and signature verification.
+                          </p>
+                          <p className="text-[10px] text-stone-400 font-mono mt-1">
+                            Dispatched via Brink's Armoured Courier
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-none font-semibold shrink-0">Instant Confirm</span>
+                    </label>
+
                     <label className={`flex items-start justify-between p-4 rounded-none border cursor-pointer transition-all ${
                       paymentMethod === 'wire' ? 'border-[#C49D3E] bg-[#F6F0DD]/30 ring-1 ring-[#C49D3E]' : 'border-stone-200 bg-white hover:border-stone-300'
                     }`}>
@@ -850,6 +928,24 @@ export default function CheckoutPage() {
                     </div>
                   )}
 
+                  {/* Cash on Delivery Active Info Card */}
+                  {paymentMethod === 'cod' && (
+                    <div className="p-4 rounded-none bg-emerald-50/60 border border-emerald-200 space-y-2.5 text-xs text-stone-800 animate-in fade-in duration-150">
+                      <div className="flex items-center space-x-2 text-stone-950 font-medium">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                        <span>Instant Order Confirmation & Dedicated Armoured Courier</span>
+                      </div>
+                      <p className="text-[11px] text-stone-600 font-light leading-relaxed">
+                        Your jewelry acquisition is immediately recorded in <strong>Confirmed</strong> status upon clicking "Confirm Cash on Delivery". Brink's Armoured Courier is allocated for insured transit and will collect payment upon delivery.
+                      </p>
+                      <div className="flex flex-wrap gap-2 text-[10px] text-stone-700 pt-1">
+                        <span className="px-2 py-0.5 bg-white border border-emerald-200 font-medium">✓ Automatic Confirmed Status</span>
+                        <span className="px-2 py-0.5 bg-white border border-emerald-200 font-medium">✓ Brink's Armoured Courier Pre-Assigned</span>
+                        <span className="px-2 py-0.5 bg-white border border-emerald-200 font-medium">✓ Instant Receipt & QR Code Download</span>
+                      </div>
+                    </div>
+                  )}
+
                   {orderError && (
                     <div className="p-3 bg-rose-50 border border-rose-200 text-xs text-rose-700">
                       {orderError}
@@ -874,7 +970,9 @@ export default function CheckoutPage() {
                       <Lock className="w-3.5 h-3.5" />
                       <span>
                         {isProcessingOrder
-                          ? 'Launching Razorpay...'
+                          ? 'Processing Acquisition...'
+                          : paymentMethod === 'cod'
+                          ? 'Confirm Cash on Delivery'
                           : paymentMethod === 'razorpay'
                           ? 'Pay with Razorpay'
                           : 'Place Atelier Order'}

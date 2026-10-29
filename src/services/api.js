@@ -173,6 +173,13 @@ export const api = {
       });
       return res.data;
     },
+    create: async (orderData) => {
+      const res = await apiRequest('/orders', {
+        method: 'POST',
+        body: orderData,
+      });
+      return res.data;
+    },
     getOrderById: async (orderId) => {
       const res = await apiRequest(`/orders/${orderId}`);
       return res.data;

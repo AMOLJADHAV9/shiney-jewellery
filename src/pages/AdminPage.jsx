@@ -559,6 +559,15 @@ export default function AdminPage() {
 
           <div className="flex items-center space-x-3">
             <button
+              onClick={() => setIsQrScannerOpen(true)}
+              className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-[#12100E] text-[#EDDFBA] border border-[#C49D3E]/60 text-xs font-semibold uppercase tracking-wider hover:bg-black transition-colors shadow-sm"
+              title="Open Live Optical Camera QR Scanner"
+            >
+              <Camera className="w-3.5 h-3.5 text-[#C49D3E]" />
+              <span>Scan QR</span>
+            </button>
+
+            <button
               onClick={loadAllData}
               disabled={isLoading}
               className="inline-flex items-center space-x-1.5 px-3 py-2 bg-white border border-stone-300 text-stone-700 text-xs font-medium hover:border-[#C49D3E] transition-colors"
@@ -1484,13 +1493,15 @@ export default function AdminPage() {
                   className="px-3 py-2 bg-stone-50 border border-stone-300 text-xs text-stone-800 focus:outline-none focus:border-[#C49D3E]"
                 >
                   <option value="all">All Statuses ({orders.length})</option>
-                  <option value="pending_confirmation">Pending Confirmation</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="processing">Processing</option>
-                  <option value="packed">Packed</option>
-                  <option value="shipped">Shipped</option>
-                  <option value="out_for_delivery">Out for Delivery</option>
-                  <option value="delivered">Delivered</option>
+                  <option value="pending_payment">Pending Payment</option>
+                  <option value="confirmed">1. Order Confirmed</option>
+                  <option value="shipping_info_received">2. Shipping Info Received</option>
+                  <option value="picked_up_by_carrier">3. Picked Up by Carrier</option>
+                  <option value="arrived_in_destination_country">4. Arrived in Destination Country</option>
+                  <option value="customs_clearance">5. Customs Clearance / Import Processing</option>
+                  <option value="arrived_at_local_delivery_facility">6. Arrived at Local Delivery Facility</option>
+                  <option value="out_for_delivery">7. Out for Delivery</option>
+                  <option value="delivered">8. Delivered</option>
                   <option value="delivery_failed">Delivery Failed</option>
                   <option value="cancelled">Cancelled</option>
                   <option value="returned">Returned</option>
@@ -1546,10 +1557,10 @@ export default function AdminPage() {
                         <span className={`px-2 py-0.5 text-[10px] uppercase font-semibold inline-block ${
                           o.status === 'delivered' ? 'bg-emerald-100 text-emerald-900' :
                           o.status === 'cancelled' || o.status === 'delivery_failed' ? 'bg-rose-100 text-rose-900' :
-                          o.status === 'shipped' || o.status === 'out_for_delivery' ? 'bg-amber-100 text-amber-900' :
+                          ['picked_up_by_carrier', 'shipped', 'out_for_delivery', 'arrived_in_destination_country', 'customs_clearance', 'arrived_at_local_delivery_facility'].includes(o.status) ? 'bg-amber-100 text-amber-900' :
                           'bg-stone-100 text-stone-800'
                         }`}>
-                          {o.status.replace(/_/g, ' ')}
+                          {o.statusLabel || o.status.replace(/_/g, ' ')}
                         </span>
                         {o.carrierName && (
                           <div className="text-[10px] text-stone-500 font-light mt-0.5 flex items-center space-x-1">
@@ -2513,6 +2524,7 @@ export default function AdminPage() {
           triggerSuccess(`Order ${updatedOrder.orderNumber} status updated to ${updatedOrder.statusLabel || updatedOrder.status}`);
         }}
         onOpenReceipt={(orderId) => handleOpenReceipt(orderId)}
+        onOpenScanner={() => setIsQrScannerOpen(true)}
       />
 
       {/* Official Receipt & QR Modal */}

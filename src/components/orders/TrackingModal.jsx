@@ -145,8 +145,8 @@ export default function TrackingModal({ isOpen, onClose, orderId, onOpenReceipt 
                   />
                 </div>
 
-                {/* Milestone Step Pills */}
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-2">
+                {/* Milestone Step Pills (8 Shipping Pipeline Stages) */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 pt-2">
                   {tracking.milestones?.map((m) => (
                     <div
                       key={m.key}
