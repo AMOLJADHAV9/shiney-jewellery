@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, SlidersHorizontal, LayoutGrid, List, RotateCcw, X } from 'lucide-react';
-import { PRODUCTS } from '../data/products';
+import { Search, SlidersHorizontal, LayoutGrid, List, RotateCcw, X, Loader2 } from 'lucide-react';
 import ProductCard from '../components/ui/ProductCard';
+import { api } from '../services/api';
 
 export default function ShopPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -13,29 +13,77 @@ export default function ShopPage() {
   const [selectedCategory, setSelectedCategory] = useState(categoryParam);
   const [searchQuery, setSearchQuery] = useState(searchParam);
   const [minPrice, setMinPrice] = useState(0);
-  const [maxPrice, setMaxPrice] = useState(4000);
+  const [maxPrice, setMaxPrice] = useState(50000);
   const [appliedMinPrice, setAppliedMinPrice] = useState(0);
-  const [appliedMaxPrice, setAppliedMaxPrice] = useState(4000);
+  const [appliedMaxPrice, setAppliedMaxPrice] = useState(50000);
   const [selectedCarat, setSelectedCarat] = useState('all');
   const [selectedBrand, setSelectedBrand] = useState('all');
   const [viewMode, setViewMode] = useState('grid');
   const [sortBy, setSortBy] = useState('featured');
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
+  // Backend data state
+  const [backendProducts, setBackendProducts] = useState([]);
+  const [backendCategories, setBackendCategories] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
   useEffect(() => {
     if (categoryParam) setSelectedCategory(categoryParam);
     if (searchParam) setSearchQuery(searchParam);
   }, [categoryParam, searchParam]);
 
-  const categories = [
-    { id: 'all', name: 'All Curations', count: PRODUCTS.length },
-    { id: 'rings', name: 'Rings', count: PRODUCTS.filter((p) => p.category === 'rings').length },
-    { id: 'necklaces', name: 'Necklaces & Pendants', count: PRODUCTS.filter((p) => p.category === 'necklaces').length },
-    { id: 'earrings', name: 'Earrings', count: PRODUCTS.filter((p) => p.category === 'earrings').length },
-    { id: 'bangles', name: 'Bangles & Cuffs', count: PRODUCTS.filter((p) => p.category === 'bangles').length },
-    { id: 'bridal', name: 'Bridal & Wedding', count: PRODUCTS.filter((p) => p.category === 'bridal').length },
-    { id: 'gifts', name: 'Gifts Set', count: PRODUCTS.filter((p) => p.category === 'gifts').length },
-  ];
+  // Load from backend
+  useEffect(() => {
+    const fetchCatalog = async () => {
+      setIsLoading(true);
+      try {
+        const [cats, prods] = await Promise.all([
+          api.catalog.getCategories().catch(() => null),
+          api.catalog.getProducts({
+            category: selectedCategory !== 'all' ? selectedCategory : undefined,
+            search: searchQuery || undefined,
+            minPrice: appliedMinPrice > 0 ? appliedMinPrice : undefined,
+            maxPrice: appliedMaxPrice < 50000 ? appliedMaxPrice : undefined,
+            sortBy,
+            limit: 100,
+          }).catch(() => null),
+        ]);
+
+        if (cats && Array.isArray(cats)) {
+          setBackendCategories(cats);
+        }
+        if (prods && Array.isArray(prods.data)) {
+          setBackendProducts(prods.data);
+        } else if (Array.isArray(prods)) {
+          setBackendProducts(prods);
+        }
+      } catch (err) {
+        console.warn('Backend catalog fetch error:', err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCatalog();
+  }, [selectedCategory, searchQuery, appliedMinPrice, appliedMaxPrice, sortBy]);
+
+  const activeProductsSource = backendProducts || [];
+
+  const categories = useMemo(() => {
+    if (backendCategories && backendCategories.length > 0) {
+      const totalCount = backendCategories.reduce((acc, c) => acc + (c.productCount || 0), 0);
+      return [
+        { id: 'all', name: 'All Curations', count: totalCount },
+        ...backendCategories.map((c) => ({
+          id: c.slug,
+          name: c.name,
+          count: c.productCount,
+        })),
+      ];
+    }
+
+    return [{ id: 'all', name: 'All Curations', count: activeProductsSource.length }];
+  }, [backendCategories, activeProductsSource.length]);
 
   const carats = ['All Carats', '10KT', '14KT', '18KT', '22KT', '24KT'];
   const brands = ['All Brands', 'Shiney Atelier', 'Olight Collection', 'Gordon Fine Arts'];
@@ -43,16 +91,16 @@ export default function ShopPage() {
   const handleApplyPriceFilter = (e) => {
     e.preventDefault();
     setAppliedMinPrice(Number(minPrice) || 0);
-    setAppliedMaxPrice(Number(maxPrice) || 4000);
+    setAppliedMaxPrice(Number(maxPrice) || 50000);
   };
 
   const handleResetFilters = () => {
     setSelectedCategory('all');
     setSearchQuery('');
     setMinPrice(0);
-    setMaxPrice(4000);
+    setMaxPrice(50000);
     setAppliedMinPrice(0);
-    setAppliedMaxPrice(4000);
+    setAppliedMaxPrice(50000);
     setSelectedCarat('all');
     setSelectedBrand('all');
     setSortBy('featured');
@@ -60,18 +108,24 @@ export default function ShopPage() {
   };
 
   const filteredProducts = useMemo(() => {
-    return PRODUCTS.filter((p) => {
-      if (selectedCategory !== 'all' && p.category !== selectedCategory) return false;
+    return activeProductsSource.filter((p) => {
+      if (selectedCategory !== 'all') {
+        const pCat = (p.category || '').toLowerCase();
+        const selCat = selectedCategory.toLowerCase();
+        if (pCat !== selCat && !pCat.startsWith(selCat + '-') && !selCat.startsWith(pCat + '-')) {
+          return false;
+        }
+      }
       if (searchQuery.trim() !== '') {
         const q = searchQuery.toLowerCase();
-        const matchesName = p.name.toLowerCase().includes(q);
-        const matchesCat = p.category.toLowerCase().includes(q);
-        const matchesMat = p.material.toLowerCase().includes(q);
+        const matchesName = (p.name || '').toLowerCase().includes(q);
+        const matchesCat = (p.category || '').toLowerCase().includes(q) || (p.categoryLabel || '').toLowerCase().includes(q);
+        const matchesMat = (p.material || '').toLowerCase().includes(q);
         if (!matchesName && !matchesCat && !matchesMat) return false;
       }
       if (p.price < appliedMinPrice || p.price > appliedMaxPrice) return false;
       if (selectedCarat !== 'all') {
-        if (!p.material.toLowerCase().includes(selectedCarat.toLowerCase())) return false;
+        if (!p.material || !p.material.toLowerCase().includes(selectedCarat.toLowerCase())) return false;
       }
       return true;
     }).sort((a, b) => {
@@ -139,7 +193,7 @@ export default function ShopPage() {
               </button>
             </div>
             <span className="text-xs text-stone-500 font-light">
-              Showing 1-{filteredProducts.length} of {PRODUCTS.length} results
+              Showing 1-{filteredProducts.length} of {activeProductsSource.length} results
             </span>
           </div>
 

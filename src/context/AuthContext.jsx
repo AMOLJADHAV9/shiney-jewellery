@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { api, getAuthToken } from '../services/api';
 
 const AuthContext = createContext();
 
@@ -13,54 +14,105 @@ export const AuthProvider = ({ children }) => {
     }
   });
 
+  const [loading, setLoading] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalTab, setAuthModalTab] = useState('login'); // 'login' | 'register' | 'forgot'
 
+  // Rehydrate session from backend on mount
   useEffect(() => {
-    try {
-      if (user) {
-        localStorage.setItem('shiney_user', JSON.stringify(user));
-      } else {
-        localStorage.removeItem('shiney_user');
+    const rehydrate = async () => {
+      const token = getAuthToken();
+      if (token) {
+        try {
+          const profile = await api.auth.getMe();
+          const mappedUser = {
+            id: profile.id,
+            name: `${profile.firstName} ${profile.lastName}`.trim() || 'Valued Patron',
+            firstName: profile.firstName,
+            lastName: profile.lastName,
+            email: profile.email,
+            role: profile.role,
+            tier: profile.role === 'admin' ? 'Salon Director & Admin' : 'Privilege Salon Member',
+            joinedDate: new Date(profile.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+            addresses: profile.addresses || [],
+          };
+          setUser(mappedUser);
+          localStorage.setItem('shiney_user', JSON.stringify(mappedUser));
+        } catch (err) {
+          console.warn('Session expired or rehydration failed:', err.message);
+          api.auth.logout();
+          setUser(null);
+          localStorage.removeItem('shiney_user');
+        }
       }
-    } catch (e) {
-      console.error('Error saving user to localStorage', e);
-    }
-  }, [user]);
-
-  const login = (usernameOrEmail, password) => {
-    // Prototype login verification
-    const patronName = usernameOrEmail.includes('@')
-      ? usernameOrEmail.split('@')[0].replace('.', ' ').replace(/^./, (str) => str.toUpperCase())
-      : usernameOrEmail;
-
-    const loggedInUser = {
-      name: patronName || 'Valued Patron',
-      email: usernameOrEmail.includes('@') ? usernameOrEmail : `${usernameOrEmail}@atelier-patron.com`,
-      tier: 'Gold Atelier Patron',
-      joinedDate: 'October 2026'
+      setLoading(false);
     };
 
-    setUser(loggedInUser);
-    setIsAuthModalOpen(false);
-    return { success: true };
+    rehydrate();
+  }, []);
+
+  const login = async (usernameOrEmail, password) => {
+    try {
+      const res = await api.auth.login(usernameOrEmail, password);
+      const profile = res.user;
+      const loggedInUser = {
+        id: profile.id,
+        name: `${profile.firstName} ${profile.lastName}`.trim() || 'Valued Patron',
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        email: profile.email,
+        role: profile.role,
+        tier: profile.role === 'admin' ? 'Salon Director & Admin' : 'Privilege Salon Member',
+        joinedDate: new Date(profile.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+      };
+
+      setUser(loggedInUser);
+      localStorage.setItem('shiney_user', JSON.stringify(loggedInUser));
+      setIsAuthModalOpen(false);
+      return { success: true, user: loggedInUser };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
   };
 
-  const register = (name, email, password) => {
-    const newUser = {
-      name: name || 'Valued Patron',
-      email: email,
-      tier: 'Privilege Salon Member',
-      joinedDate: 'October 2026'
-    };
+  const register = async (name, email, password) => {
+    try {
+      const parts = (name || '').trim().split(' ');
+      const firstName = parts[0] || 'Valued';
+      const lastName = parts.slice(1).join(' ') || 'Patron';
 
-    setUser(newUser);
-    setIsAuthModalOpen(false);
-    return { success: true };
+      const res = await api.auth.register({
+        email,
+        password,
+        firstName,
+        lastName,
+      });
+
+      const profile = res.user;
+      const newUser = {
+        id: profile.id,
+        name: `${profile.firstName} ${profile.lastName}`.trim() || 'Valued Patron',
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        email: profile.email,
+        role: profile.role,
+        tier: 'Privilege Salon Member',
+        joinedDate: new Date(profile.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+      };
+
+      setUser(newUser);
+      localStorage.setItem('shiney_user', JSON.stringify(newUser));
+      setIsAuthModalOpen(false);
+      return { success: true, user: newUser };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
   };
 
   const logout = () => {
+    api.auth.logout();
     setUser(null);
+    localStorage.removeItem('shiney_user');
   };
 
   const openAuthModal = (tab = 'login') => {
@@ -76,7 +128,9 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider
       value={{
         user,
+        loading,
         isAuthenticated: !!user,
+        isAdmin: user?.role === 'admin' || user?.role === 'super_admin',
         login,
         register,
         logout,
@@ -85,7 +139,7 @@ export const AuthProvider = ({ children }) => {
         authModalTab,
         setAuthModalTab,
         openAuthModal,
-        closeAuthModal
+        closeAuthModal,
       }}
     >
       {children}

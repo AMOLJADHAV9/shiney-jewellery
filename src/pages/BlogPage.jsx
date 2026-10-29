@@ -1,16 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight, ArrowRight, Sparkles, Clock, Calendar, User, BookOpen } from 'lucide-react';
 import { BLOG_POSTS } from '../data/blogPosts';
+import { api } from '../services/api';
 
 export default function BlogPage() {
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [posts, setPosts] = useState(BLOG_POSTS);
 
   const categories = ['All', 'Accessories', 'Diamonds', 'Earrings', 'Gifts Set', 'Necklaces & Pendants', 'Pearls', 'Rings', 'Wedding'];
 
-  const filteredPosts = selectedCategory === 'All'
-    ? BLOG_POSTS
-    : BLOG_POSTS.filter((post) => post.category.toLowerCase() === selectedCategory.toLowerCase());
+  useEffect(() => {
+    api.blog
+      .getPosts({ category: selectedCategory !== 'All' ? selectedCategory : undefined })
+      .then((res) => {
+        if (res && Array.isArray(res.data) && res.data.length > 0) {
+          setPosts(res.data);
+        }
+      })
+      .catch((err) => {
+        console.warn('Backend blog fetch fallback:', err.message);
+      });
+  }, [selectedCategory]);
+
+  const filteredPosts = posts;
 
   return (
     <div className="bg-[#FAF8F5] text-stone-900 pb-24">

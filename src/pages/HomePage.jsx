@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Sparkles, ArrowRight, ShieldCheck, Gem, Award, Clock, ArrowUpRight, Star, Heart, ChevronLeft, ChevronRight, ArrowLeftRight, Eye, Check, X } from 'lucide-react';
-import { CATEGORIES, PRODUCTS, TRUST_PILLARS, TESTIMONIALS } from '../data/products';
+import { CATEGORIES, TRUST_PILLARS, TESTIMONIALS } from '../data/products';
 import ProductCard from '../components/ui/ProductCard';
 import { useCart } from '../context/CartContext';
+import { api } from '../services/api';
 
 export default function HomePage() {
   const { addToCart, toggleWishlist, isInWishlist, showToast } = useCart();
@@ -97,86 +98,39 @@ export default function HomePage() {
     setQuickViewItem(item);
   };
 
-  const trendingProducts = [
-    {
-      id: 'sh-ear-fg-25',
-      slug: 'faded-grandeur-stud-earrings',
-      category: 'ACCESSORIES, PEARLES',
-      title: 'Faded Grandeur Stud Earrings',
-      reviews: 5,
-      rating: 4,
-      price: '$285.00',
-      priceNum: 285,
-      image: '/images/trending/faded-grandeur-earrings.png',
-      link: '/product/faded-grandeur-stud-earrings',
-      description: 'Modern sculptural studs with bezel-set brilliant crystals and pear-cut drops in 18k yellow gold.'
-    },
-    {
-      id: 'trend-sunburst-medallion',
-      slug: 'sunburst-medallion-gold-necklace',
-      category: 'NECKLACES & PENDANTS',
-      title: 'Sunburst Medallion Gold Necklace',
-      reviews: 5,
-      rating: 5,
-      price: '$730.08',
-      priceNum: 730.08,
-      image: '/images/trending/trend-1.png',
-      link: '/shop?category=necklaces',
-      description: 'Handcrafted sunflower pendant with pavé diamonds set in 18k yellow gold.'
-    },
-    {
-      id: 'trend-sculpted-link-bracelet',
-      slug: 'sculpted-link-gold-bracelet',
-      category: 'BANGLES & BRACELETS',
-      title: 'Sculpted Link Gold Bracelet',
-      reviews: 5,
-      rating: 5,
-      price: '$906.20',
-      priceNum: 906.20,
-      image: '/images/trending/trend-2.png',
-      link: '/shop?category=bangles',
-      description: 'Substantial interlocking solid gold links sculpted for effortless wrist elegance.'
-    },
-    {
-      id: 'trend-14k-parker-ring',
-      slug: '14k-gold-parker-ring',
-      category: 'RINGS & SOLITAIRES',
-      title: '14k Gold Parker Ring',
-      reviews: 5,
-      rating: 5,
-      price: '$56.98',
-      priceNum: 56.98,
-      image: '/images/trending/trend-3.png',
-      link: '/shop?category=rings',
-      description: 'Classic minimalist band with radiant polished finish in solid gold.'
-    },
-    {
-      id: 'trend-golden-blossom-sets',
-      slug: 'gorgeous-golden-blossom-sets',
-      category: 'RINGS, WEDDING',
-      title: 'Gorgeous Golden Blossom Sets',
-      reviews: 5,
-      rating: 5,
-      price: '$487.35',
-      priceNum: 487.35,
-      image: '/images/trending/trend-4.png',
-      link: '/shop?category=bridal',
-      description: 'Intricately clustered floral halo motif pairing fine cut diamonds with yellow gold.'
-    },
-    {
-      id: 'trend-10k-gold-eternity-ring',
-      slug: '10k-gold-eternity-ring',
-      category: 'DIAMONDS, RINGS',
-      title: '10K Gold Eternity Ring',
-      reviews: 5,
-      rating: 5,
-      price: '$487.35',
-      priceNum: 487.35,
-      image: '/images/trending/trend-5.png',
-      link: '/shop?category=rings',
-      description: 'Continuous circlet of prong-set brilliant diamonds symbolizing unending devotion.'
-    }
-  ];
+  const [dbProducts, setDbProducts] = useState([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+
+  useEffect(() => {
+    api.catalog.getProducts({ limit: 100 })
+      .then((res) => {
+        const items = res?.data || (Array.isArray(res) ? res : []);
+        setDbProducts(items);
+      })
+      .catch((err) => {
+        console.error('Failed to load database products on homepage:', err);
+        setDbProducts([]);
+      })
+      .finally(() => setIsLoadingProducts(false));
+  }, []);
+
+  const trendingProducts = React.useMemo(() => {
+    const pool = dbProducts.filter((p) => p.featured || p.isFeatured);
+    const items = pool.length > 0 ? pool.slice(0, 6) : dbProducts.slice(0, 6);
+    return items.map((p) => ({
+      id: p.id,
+      slug: p.slug,
+      category: (p.categoryLabel || p.category || 'Fine Jewellery').toUpperCase(),
+      title: p.name,
+      reviews: p.reviewsCount || 5,
+      rating: p.rating || 5,
+      price: `$${Number(p.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      priceNum: Number(p.price),
+      image: (p.images && p.images[0]) || p.primaryImage || '/images/r1.jpg',
+      link: `/product/${p.slug}`,
+      description: p.shortDescription || p.description || '',
+    }));
+  }, [dbProducts]);
 
   const latestBlogs = [
     {
@@ -329,12 +283,15 @@ export default function HomePage() {
     setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
   };
 
-  const bestSellers = PRODUCTS.filter((p) => p.bestSeller);
-  const newArrivals = PRODUCTS.filter((p) => p.newArrival);
+  const bestSellers = dbProducts.filter((p) => p.bestSeller || p.isBestSeller);
+  const newArrivals = dbProducts.filter((p) => p.newArrival || p.isNewArrival);
 
   const displayedProducts = activeTab === 'all'
-    ? bestSellers
-    : PRODUCTS.filter((p) => p.category === activeTab);
+    ? (bestSellers.length > 0 ? bestSellers : dbProducts.slice(0, 8))
+    : dbProducts.filter((p) => {
+        const c = (p.category || '').toLowerCase();
+        return c === activeTab.toLowerCase() || c.startsWith(activeTab.toLowerCase() + '-');
+      });
 
   const craftsmanshipSteps = [
     {
@@ -712,7 +669,7 @@ export default function HomePage() {
             to="/shop"
             className="inline-flex items-center px-8 py-3.5 bg-stone-900 text-[#EDDFBA] hover:bg-stone-800 text-xs font-semibold uppercase tracking-widest rounded-none shadow-md transition-all group"
           >
-            <span>View All Curated Pieces ({PRODUCTS.length})</span>
+            <span>View All Curated Pieces ({dbProducts.length})</span>
             <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>
@@ -798,18 +755,18 @@ export default function HomePage() {
                       </h3>
                     </Link>
 
-                    {/* Star Rating: 4 gold + 1 empty for 4-star, 5 gold for 5-star */}
+                    {/* Star Rating: safe integer length */}
                     <div className="flex items-center justify-center space-x-1 pt-0.5">
                       <div className="flex items-center space-x-0.5 text-[#D7A32F]">
-                        {[...Array(item.rating || 4)].map((_, i) => (
+                        {[...Array(Math.min(5, Math.max(0, Math.round(Number(item.rating) || 5))))].map((_, i) => (
                           <Star key={`f-${i}`} className="w-3.5 h-3.5 fill-[#D7A32F] text-[#D7A32F]" />
                         ))}
-                        {[...Array(5 - (item.rating || 4))].map((_, i) => (
+                        {[...Array(Math.max(0, 5 - Math.min(5, Math.max(0, Math.round(Number(item.rating) || 5)))))].map((_, i) => (
                           <Star key={`e-${i}`} className="w-3.5 h-3.5 fill-stone-200 text-stone-300" />
                         ))}
                       </div>
                       <span className="text-[11px] text-stone-500 font-normal ml-1">
-                        ({item.reviews} Reviews)
+                        ({item.reviews || 5} Reviews)
                       </span>
                     </div>
                   </div>
@@ -1202,7 +1159,7 @@ export default function HomePage() {
               >
                 <div className="space-y-3">
                   <div className="flex text-amber-500 space-x-0.5">
-                    {[...Array(t.rating)].map((_, i) => (
+                    {[...Array(Math.min(5, Math.max(1, Math.round(Number(t.rating) || 5))))].map((_, i) => (
                       <Star key={i} className="w-4 h-4 fill-amber-500" />
                     ))}
                   </div>
@@ -1293,15 +1250,15 @@ export default function HomePage() {
 
                 <div className="flex items-center space-x-1">
                   <div className="flex items-center text-[#D7A32F]">
-                    {[...Array(quickViewItem.rating || 4)].map((_, i) => (
+                    {[...Array(Math.min(5, Math.max(0, Math.round(Number(quickViewItem.rating) || 5))))].map((_, i) => (
                       <Star key={`qv-f-${i}`} className="w-3.5 h-3.5 fill-[#D7A32F] text-[#D7A32F]" />
                     ))}
-                    {[...Array(5 - (quickViewItem.rating || 4))].map((_, i) => (
+                    {[...Array(Math.max(0, 5 - Math.min(5, Math.max(0, Math.round(Number(quickViewItem.rating) || 5)))))].map((_, i) => (
                       <Star key={`qv-e-${i}`} className="w-3.5 h-3.5 fill-stone-200 text-stone-300" />
                     ))}
                   </div>
                   <span className="text-xs text-stone-500 font-normal ml-1">
-                    ({quickViewItem.reviews} Reviews)
+                    ({quickViewItem.reviews || 5} Reviews)
                   </span>
                 </div>
 

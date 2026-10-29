@@ -1,11 +1,29 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ChevronRight, ArrowLeft, Clock, Calendar, User, Share2, Sparkles, ArrowRight } from 'lucide-react';
 import { BLOG_POSTS } from '../data/blogPosts';
+import { api } from '../services/api';
 
 export default function BlogPostPage() {
   const { slug } = useParams();
-  const post = BLOG_POSTS.find((p) => p.slug === slug);
+  const localFallback = BLOG_POSTS.find((p) => p.slug === slug);
+  const [post, setPost] = useState(localFallback);
+
+  useEffect(() => {
+    let isMounted = true;
+    api.blog
+      .getPostBySlug(slug)
+      .then((data) => {
+        if (isMounted && data) {
+          setPost(data);
+        }
+      })
+      .catch((err) => {
+        console.warn('Backend single post fetch fallback:', err.message);
+      });
+
+    return () => { isMounted = false; };
+  }, [slug]);
 
   if (!post) {
     return (

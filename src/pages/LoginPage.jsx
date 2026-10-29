@@ -1,21 +1,25 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Sparkles, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get('redirect') || '/account';
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!identifier.trim()) {
-      setError('Please provide your username or email address.');
+      setError('Please provide your email address.');
       return;
     }
     if (!password) {
@@ -23,8 +27,15 @@ export default function LoginPage() {
       return;
     }
     setError('');
-    login(identifier, password);
-    navigate('/account');
+    setIsSubmitting(true);
+    const result = await login(identifier, password);
+    setIsSubmitting(false);
+
+    if (result.success) {
+      navigate(redirect);
+    } else {
+      setError(result.error || 'Failed to sign in. Please verify your credentials.');
+    }
   };
 
   return (
@@ -35,7 +46,7 @@ export default function LoginPage() {
         <div className="flex items-center justify-between pb-2 border-b border-stone-100">
           <span className="text-xl font-medium text-stone-900">Sign in</span>
           <Link
-            to="/register"
+            to={redirect !== '/account' ? `/register?redirect=${encodeURIComponent(redirect)}` : '/register'}
             className="text-base font-normal text-stone-500 hover:text-stone-900 transition-colors"
           >
             Create an Account

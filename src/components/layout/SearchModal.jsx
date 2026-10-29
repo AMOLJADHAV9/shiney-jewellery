@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, ArrowRight, Sparkles } from 'lucide-react';
+import { Search, X, ArrowRight, Sparkles, Loader2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { PRODUCTS } from '../../data/products';
+import { api } from '../../services/api';
 
 export default function SearchModal({ isOpen, onClose }) {
   const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
   const inputRef = useRef(null);
   const navigate = useNavigate();
 
@@ -15,6 +17,7 @@ export default function SearchModal({ isOpen, onClose }) {
     } else {
       document.body.style.overflow = 'auto';
       setQuery('');
+      setResults([]);
     }
     return () => {
       document.body.style.overflow = 'auto';
@@ -32,20 +35,31 @@ export default function SearchModal({ isOpen, onClose }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  // Live query to Database API
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    const timer = setTimeout(() => {
+      api.catalog.getProducts({ search: query.trim(), limit: 6 })
+        .then((res) => {
+          const items = res?.data || (Array.isArray(res) ? res : []);
+          setResults(items);
+        })
+        .catch(() => setResults([]))
+        .finally(() => setIsSearching(false));
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
   if (!isOpen) return null;
 
-  const filteredProducts = query.trim() === ''
-    ? []
-    : PRODUCTS.filter((p) => {
-        const q = query.toLowerCase();
-        return (
-          p.name.toLowerCase().includes(q) ||
-          p.category.toLowerCase().includes(q) ||
-          p.material.toLowerCase().includes(q) ||
-          (p.gemstone && p.gemstone.toLowerCase().includes(q)) ||
-          p.tags.some((t) => t.toLowerCase().includes(q))
-        );
-      }).slice(0, 6);
+  const filteredProducts = results;
 
   const handleSelectProduct = (product) => {
     onClose();
@@ -137,7 +151,7 @@ export default function SearchModal({ isOpen, onClose }) {
                     className="flex items-center p-2.5 rounded-none border border-stone-100 hover:border-[#D4B35F] hover:bg-[#FAF8F5] cursor-pointer transition-all group"
                   >
                     <img
-                      src={p.images[0]}
+                      src={(p.images && p.images[0]) || p.primaryImage || '/images/r1.jpg'}
                       alt={p.name}
                       className="w-14 h-14 object-cover rounded-none mr-3 shrink-0 border border-stone-200/60 group-hover:scale-105 transition-transform"
                     />

@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { User, Package, Heart, MapPin, ShieldCheck, Sparkles, LogOut, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { User, Package, Heart, MapPin, ShieldCheck, Sparkles, LogOut, CheckCircle2, Eye, EyeOff, Truck, FileText, QrCode } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../services/api';
+import TrackingModal from '../components/orders/TrackingModal';
+import ReceiptModal from '../components/orders/ReceiptModal';
 
 export default function AccountPage() {
   const { wishlist, cart } = useCart();
@@ -18,25 +21,58 @@ export default function AccountPage() {
   const [regPass, setRegPass] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [realOrders, setRealOrders] = useState([]);
 
-  const handleGuestLogin = (e) => {
+  // Modal states for Tracking & Receipt
+  const [activeTrackingOrderId, setActiveTrackingOrderId] = useState(null);
+  const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
+  const [activeReceiptOrderId, setActiveReceiptOrderId] = useState(null);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      api.orders.getMyOrders()
+        .then((orders) => {
+          if (Array.isArray(orders)) {
+            setRealOrders(orders.map((o) => ({
+              id: o.orderNumber,
+              orderId: o.id,
+              date: new Date(o.placedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+              total: parseFloat(o.totalAmount || 0),
+              status: (o.status || 'confirmed').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+              items: [`Order with ${o.itemsCount || 1} piece(s)`],
+              tracking: o.trackingNumber ? `${o.carrierName || 'Armoured Courier'} (${o.trackingNumber})` : 'BRK-Armoured-Verified',
+            })));
+          }
+        })
+        .catch((e) => console.warn('Could not fetch real orders:', e.message));
+    }
+  }, [isAuthenticated]);
+
+  const handleGuestLogin = async (e) => {
     e.preventDefault();
     if (!loginId.trim() || !loginPass) {
-      setAuthError('Please provide your username/email and password.');
+      setAuthError('Please provide your email and password.');
       return;
     }
     setAuthError('');
-    login(loginId, loginPass);
+    const res = await login(loginId, loginPass);
+    if (!res.success) {
+      setAuthError(res.error || 'Failed to sign in.');
+    }
   };
 
-  const handleGuestRegister = (e) => {
+  const handleGuestRegister = async (e) => {
     e.preventDefault();
     if (!regUser.trim() || !regEmail.trim() || regPass.length < 6) {
       setAuthError('Please complete all fields (password at least 6 characters).');
       return;
     }
     setAuthError('');
-    register(regUser, regEmail, regPass);
+    const res = await register(regUser, regEmail, regPass);
+    if (!res.success) {
+      setAuthError(res.error || 'Failed to create account.');
+    }
   };
 
   const mockOrders = [
@@ -57,6 +93,8 @@ export default function AccountPage() {
       tracking: 'BRK-55219-US'
     }
   ];
+
+  const displayedOrders = realOrders.length > 0 ? realOrders : mockOrders;
 
   if (!isAuthenticated) {
     return (
@@ -300,8 +338,8 @@ export default function AccountPage() {
                 </div>
 
                 <div className="space-y-4">
-                  {mockOrders.map((order) => (
-                    <div key={order.id} className="p-5 rounded-none border border-stone-200 bg-white space-y-3">
+                  {displayedOrders.map((order) => (
+                    <div key={order.id} className="p-5 rounded-none border border-stone-200 bg-white space-y-4 hover:border-[#DFD5C6] transition-colors">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-3 gap-2">
                         <div>
                           <span className="font-mono text-xs font-bold text-stone-900">{order.id}</span>
@@ -313,9 +351,43 @@ export default function AccountPage() {
                         </div>
                       </div>
 
-                      <div className="text-xs text-stone-600">
+                      <div className="text-xs text-stone-600 space-y-1">
                         <p><strong>Pieces:</strong> {order.items.join(', ')}</p>
-                        <p className="text-stone-500 mt-1">Armoured Tracking: <span className="font-mono text-stone-700">{order.tracking}</span></p>
+                        {order.tracking && (
+                          <p className="text-stone-500">
+                            Armoured Courier: <span className="font-mono text-stone-700">{order.tracking}</span>
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between pt-3 border-t border-stone-100 gap-2">
+                        <div className="text-[11px] text-stone-400 font-light">
+                          Tamper-evident insured dispatch
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveTrackingOrderId(order.orderId || order.id);
+                              setIsTrackingModalOpen(true);
+                            }}
+                            className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-[#12100E] text-[#EDDFBA] hover:bg-stone-800 text-xs font-semibold uppercase tracking-wider transition-colors"
+                          >
+                            <Truck className="w-3.5 h-3.5 text-[#C49D3E]" />
+                            <span>Track Delivery</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveReceiptOrderId(order.orderId || order.id);
+                              setIsReceiptModalOpen(true);
+                            }}
+                            className="inline-flex items-center space-x-1.5 px-3 py-1.5 border border-stone-300 text-stone-700 hover:text-stone-950 text-xs font-semibold uppercase tracking-wider transition-colors"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-[#C49D3E]" />
+                            <span>Receipt & QR</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -329,15 +401,15 @@ export default function AccountPage() {
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div>
                     <label className="block text-stone-500 mb-1">Full Name</label>
-                    <input type="text" readOnly value="Lady Charlotte Vance" className="w-full p-2.5 bg-stone-50 border rounded-none text-stone-800" />
+                    <input type="text" readOnly value={user?.name || 'Valued Patron'} className="w-full p-2.5 bg-stone-50 border rounded-none text-stone-800" />
                   </div>
                   <div>
                     <label className="block text-stone-500 mb-1">Email Address</label>
-                    <input type="email" readOnly value="charlotte.vance@atelier-patron.com" className="w-full p-2.5 bg-stone-50 border rounded-none text-stone-800" />
+                    <input type="email" readOnly value={user?.email || 'patron@atelier.com'} className="w-full p-2.5 bg-stone-50 border rounded-none text-stone-800" />
                   </div>
                   <div>
-                    <label className="block text-stone-500 mb-1">Preferred Salon</label>
-                    <input type="text" readOnly value="London — Bond Street, Mayfair" className="w-full p-2.5 bg-stone-50 border rounded-none text-stone-800" />
+                    <label className="block text-stone-500 mb-1">VIP Atelier Tier</label>
+                    <input type="text" readOnly value={user?.tier || 'Privilege Salon Member'} className="w-full p-2.5 bg-stone-50 border rounded-none text-stone-800" />
                   </div>
                   <div>
                     <label className="block text-stone-500 mb-1">Ring Size</label>
@@ -366,6 +438,30 @@ export default function AccountPage() {
 
         </div>
       </div>
+
+      {/* Customer Delivery Tracking Modal */}
+      <TrackingModal
+        isOpen={isTrackingModalOpen}
+        onClose={() => {
+          setIsTrackingModalOpen(false);
+          setActiveTrackingOrderId(null);
+        }}
+        orderId={activeTrackingOrderId}
+        onOpenReceipt={() => {
+          setActiveReceiptOrderId(activeTrackingOrderId);
+          setIsReceiptModalOpen(true);
+        }}
+      />
+
+      {/* Customer Receipt & QR Modal */}
+      <ReceiptModal
+        isOpen={isReceiptModalOpen}
+        onClose={() => {
+          setIsReceiptModalOpen(false);
+          setActiveReceiptOrderId(null);
+        }}
+        orderId={activeReceiptOrderId}
+      />
 
     </div>
   );

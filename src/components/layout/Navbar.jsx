@@ -14,7 +14,7 @@ export default function Navbar() {
   const userButtonRef = useRef(null);
   
   const { cartCount, wishlist, setIsCartOpen } = useCart();
-  const { isAuthModalOpen, setIsAuthModalOpen } = useAuth();
+  const { isAuthModalOpen, setIsAuthModalOpen, isAdmin } = useAuth();
   const location = useLocation();
 
   const isHome = location.pathname === '/';
@@ -380,6 +380,9 @@ export default function Navbar() {
                     <Link to="/checkout" className="block py-2 px-3 rounded-none hover:bg-[#F6F0DD] font-serif text-xs font-medium text-stone-800">
                       Checkout
                     </Link>
+                    <Link to="/admin" className="block py-2 px-3 rounded-none hover:bg-[#F6F0DD] font-serif text-xs font-medium text-[#846127]">
+                      Atelier Admin
+                    </Link>
                   </div>
                 )}
               </div>
@@ -489,6 +492,18 @@ export default function Navbar() {
                   </span>
                 )}
               </Link>
+
+              {/* Admin Portal Quick Link */}
+              {isAdmin && (
+                <Link
+                  to="/admin"
+                  className="hidden sm:inline-flex items-center space-x-1 px-2.5 py-1 bg-[#12100E] text-[#EDDFBA] border border-[#C49D3E]/40 text-[10px] font-bold uppercase tracking-wider hover:bg-stone-900 transition-colors"
+                  title="Atelier Administration"
+                >
+                  <Sparkles className="w-3 h-3 text-[#C49D3E]" />
+                  <span>Admin</span>
+                </Link>
+              )}
 
               {/* Account Icon with Anchored Auth Popover (Matching Screenshot) */}
               <div className="relative" ref={userButtonRef}>

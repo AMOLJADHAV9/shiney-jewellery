@@ -1,23 +1,85 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Heart, ShoppingBag, Star, ShieldCheck, Gem, Sparkles, Truck, RotateCcw, Check, ChevronRight, Share2, CreditCard, Users, Shield } from 'lucide-react';
-import { PRODUCTS } from '../data/products';
+import { Heart, ShoppingBag, Star, ShieldCheck, Gem, Sparkles, Truck, RotateCcw, Check, ChevronRight, Share2, CreditCard, Users, Shield, Loader2 } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import ProductCard from '../components/ui/ProductCard';
+import { api } from '../services/api';
 
 export default function ProductDetailPage() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { addToCart, toggleWishlist, isInWishlist } = useCart();
 
-  const product = PRODUCTS.find((p) => p.slug === slug);
+  const [product, setProduct] = useState(null);
+  const [relatedProducts, setRelatedProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    setLoading(true);
+    api.catalog.getProductBySlug(slug)
+      .then((data) => {
+        if (isMounted && data) {
+          setProduct(data);
+          if (data.variants && data.variants.length > 0) {
+            setSelectedVariant(data.variants.find((v) => v.inStock) || data.variants[0]);
+          }
+
+          // Fetch related products dynamically from DB
+          api.catalog.getProducts({ category: data.category, limit: 6 })
+            .then((rel) => {
+              if (isMounted) {
+                const items = rel?.data || (Array.isArray(rel) ? rel : []);
+                setRelatedProducts(items.filter((p) => p.id !== data.id).slice(0, 5));
+              }
+            })
+            .catch(() => {});
+        }
+      })
+      .catch((err) => {
+        console.warn('Backend product fetch error:', err.message);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => { isMounted = false; };
+  }, [slug]);
+
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [selectedVariant, setSelectedVariant] = useState(
+    product?.variants ? product.variants.find((v) => v.inStock) || product.variants[0] : null
+  );
+  const [quantity, setQuantity] = useState(1);
+  const [activeTab, setActiveTab] = useState('description');
+  const [addedAnimation, setAddedAnimation] = useState(false);
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [subscribed, setSubscribed] = useState(false);
+
+  useEffect(() => {
+    setActiveImageIndex(0);
+    if (product?.variants) {
+      setSelectedVariant(product.variants.find((v) => v.inStock) || product.variants[0]);
+    }
+    setQuantity(1);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [slug, product?.id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-3 bg-[#FAF8F5]">
+        <Loader2 className="w-8 h-8 text-[#C49D3E] animate-spin" />
+        <p className="text-xs uppercase tracking-widest text-stone-500 font-medium">Curating Atelier Creation...</p>
+      </div>
+    );
+  }
 
   if (!product) {
     return (
       <div className="max-w-4xl mx-auto py-24 px-4 text-center space-y-4">
         <h1 className="font-serif text-3xl text-stone-900">Creation Not Found</h1>
         <p className="text-sm text-stone-500 font-light">
-          The fine jewellery piece you are seeking may have been archived or is temporarily unavailable.
+          The fine jewellery piece you are seeking may have been archived or is temporarily unavailable in our atelier.
         </p>
         <Link
           to="/shop"
@@ -28,25 +90,6 @@ export default function ProductDetailPage() {
       </div>
     );
   }
-
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const [selectedVariant, setSelectedVariant] = useState(
-    product.variants ? product.variants.find((v) => v.inStock) || product.variants[0] : null
-  );
-  const [quantity, setQuantity] = useState(1);
-  const [activeTab, setActiveTab] = useState('description');
-  const [addedAnimation, setAddedAnimation] = useState(false);
-  const [newsletterEmail, setNewsletterEmail] = useState('');
-  const [subscribed, setSubscribed] = useState(false);
-
-  useEffect(() => {
-    setActiveImageIndex(0);
-    if (product.variants) {
-      setSelectedVariant(product.variants.find((v) => v.inStock) || product.variants[0]);
-    }
-    setQuantity(1);
-    window.scrollTo({ top: 0, behavior: 'instant' });
-  }, [slug]);
 
   const isFavorited = isInWishlist(product.id);
 
@@ -60,8 +103,6 @@ export default function ProductDetailPage() {
     addToCart(product, selectedVariant, quantity);
     navigate('/checkout');
   };
-
-  const relatedProducts = PRODUCTS.filter((p) => p.id !== product.id).slice(0, 5);
 
   const discountPercentage = product.compareAtPrice
     ? Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100)

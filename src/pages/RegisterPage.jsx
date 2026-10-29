@@ -1,20 +1,24 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function RegisterPage() {
   const { register } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get('redirect') || '/account';
 
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!username.trim()) {
-      setError('Please provide a username.');
+      setError('Please provide your name or username.');
       return;
     }
     if (!email.trim() || !email.includes('@')) {
@@ -26,8 +30,15 @@ export default function RegisterPage() {
       return;
     }
     setError('');
-    register(username, email, password);
-    navigate('/account');
+    setIsSubmitting(true);
+    const result = await register(username, email, password);
+    setIsSubmitting(false);
+
+    if (result.success) {
+      navigate(redirect);
+    } else {
+      setError(result.error || 'Failed to create your account. Please try again.');
+    }
   };
 
   return (
@@ -37,7 +48,7 @@ export default function RegisterPage() {
         {/* Header Tabs */}
         <div className="flex items-center justify-between pb-2 border-b border-stone-100">
           <Link
-            to="/login"
+            to={redirect !== '/account' ? `/login?redirect=${encodeURIComponent(redirect)}` : '/login'}
             className="text-base font-normal text-stone-500 hover:text-stone-900 transition-colors"
           >
             Sign in

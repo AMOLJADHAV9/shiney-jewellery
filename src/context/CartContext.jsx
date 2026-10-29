@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { api } from '../services/api';
 
 const CartContext = createContext();
 
@@ -25,6 +26,33 @@ export const CartProvider = ({ children }) => {
 
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Sync with backend cart on mount
+  useEffect(() => {
+    const fetchBackendCart = async () => {
+      try {
+        const backendCart = await api.cart.getCart();
+        if (backendCart && Array.isArray(backendCart.items)) {
+          // Map backend items to frontend format
+          const mappedItems = backendCart.items.map((item) => ({
+            id: item.id,
+            product: item.product,
+            variant: item.variant,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            lineTotal: item.lineTotal,
+            customEngravingText: item.customEngravingText,
+          }));
+          setCart(mappedItems);
+        }
+      } catch (err) {
+        console.warn('Backend cart sync skipped or running offline:', err.message);
+      }
+    };
+
+    fetchBackendCart();
+  }, []);
 
   useEffect(() => {
     try {
@@ -49,11 +77,12 @@ export const CartProvider = ({ children }) => {
     }, 3200);
   };
 
-  const addToCart = (product, variant = null, quantity = 1) => {
+  const addToCart = async (product, variant = null, quantity = 1, customEngravingText = null) => {
     const cartItemId = variant ? `${product.id}_${variant.id}` : product.id;
-    
+
+    // Optimistic UI update
     setCart((prevCart) => {
-      const existingIndex = prevCart.findIndex((item) => item.id === cartItemId);
+      const existingIndex = prevCart.findIndex((item) => item.id === cartItemId || item.variant?.id === variant?.id);
       if (existingIndex > -1) {
         const updated = [...prevCart];
         updated[existingIndex].quantity += quantity;
@@ -66,35 +95,67 @@ export const CartProvider = ({ children }) => {
             product,
             variant,
             quantity,
-            unitPrice: product.price
-          }
+            unitPrice: product.price + (variant?.priceDelta || 0),
+            customEngravingText,
+          },
         ];
       }
     });
 
     showToast(`Added "${product.name}"${variant ? ` (${variant.name})` : ''} to your bag`);
     setIsCartOpen(true);
+
+    // Sync to backend asynchronously
+    try {
+      setIsSyncing(true);
+      await api.cart.addItem({
+        productId: product.uuid || product.id,
+        variantId: variant?.id || undefined,
+        quantity,
+        customEngravingText: customEngravingText || undefined,
+      });
+    } catch (err) {
+      console.warn('Backend cart addItem warning:', err.message);
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
-  const removeFromCart = (cartItemId) => {
+  const removeFromCart = async (cartItemId) => {
     setCart((prev) => prev.filter((item) => item.id !== cartItemId));
     showToast('Item removed from your bag');
+
+    try {
+      await api.cart.removeItem(cartItemId);
+    } catch (err) {
+      console.warn('Backend cart removeItem warning:', err.message);
+    }
   };
 
-  const updateQuantity = (cartItemId, newQuantity) => {
+  const updateQuantity = async (cartItemId, newQuantity) => {
     if (newQuantity <= 0) {
-      removeFromCart(cartItemId);
-      return;
+      return removeFromCart(cartItemId);
     }
     setCart((prev) =>
       prev.map((item) =>
         item.id === cartItemId ? { ...item, quantity: newQuantity } : item
       )
     );
+
+    try {
+      await api.cart.updateQuantity(cartItemId, newQuantity);
+    } catch (err) {
+      console.warn('Backend cart updateQuantity warning:', err.message);
+    }
   };
 
-  const clearCart = () => {
+  const clearCart = async () => {
     setCart([]);
+    try {
+      await api.cart.clearCart();
+    } catch (err) {
+      console.warn('Backend cart clearCart warning:', err.message);
+    }
   };
 
   const toggleWishlist = (productId) => {
@@ -136,7 +197,8 @@ export const CartProvider = ({ children }) => {
         freeShippingThreshold,
         freeShippingProgress,
         remainingForFreeShipping,
-        toastMessage
+        toastMessage,
+        isSyncing,
       }}
     >
       {children}

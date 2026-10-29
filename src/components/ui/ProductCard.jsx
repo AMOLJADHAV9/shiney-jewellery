@@ -9,7 +9,8 @@ export default function ProductCard({ product }) {
   const [justAdded, setJustAdded] = useState(false);
 
   const isFavorited = isInWishlist(product.id);
-  const secondaryImage = product.images[1] || product.images[0];
+  const primaryImg = (product.images && product.images[0]) || product.primaryImage || '/images/r1.jpg';
+  const secondaryImage = (product.images && product.images[1]) || primaryImg;
 
   const handleQuickAdd = (e) => {
     e.preventDefault();
@@ -41,7 +42,7 @@ export default function ProductCard({ product }) {
         onMouseLeave={() => setImageIndex(0)}
       >
         <img
-          src={imageIndex === 1 ? secondaryImage : product.images[0]}
+          src={imageIndex === 1 ? secondaryImage : primaryImg}
           alt={product.name}
           className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out rounded-none"
           loading="lazy"

@@ -1,13 +1,23 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, Trash2, ShoppingBag, ArrowRight, Sparkles } from 'lucide-react';
 import { useCart } from '../context/CartContext';
-import { PRODUCTS } from '../data/products';
+import { api } from '../services/api';
 
 export default function WishlistPage() {
   const { wishlist, toggleWishlist, addToCart } = useCart();
+  const [allProducts, setAllProducts] = useState([]);
 
-  const wishlistedProducts = PRODUCTS.filter((p) => wishlist.includes(p.id));
+  useEffect(() => {
+    api.catalog.getProducts({ limit: 100 })
+      .then((res) => {
+        const items = res?.data || (Array.isArray(res) ? res : []);
+        setAllProducts(items);
+      })
+      .catch(() => setAllProducts([]));
+  }, []);
+
+  const wishlistedProducts = allProducts.filter((p) => wishlist.includes(p.id) || wishlist.includes(p.slug) || wishlist.includes(p.sku));
 
   return (
     <div className="bg-[#FAF8F5] min-h-screen text-stone-900 pb-24">
@@ -56,7 +66,7 @@ export default function WishlistPage() {
               >
                 <div className="relative aspect-square overflow-hidden bg-stone-100">
                   <Link to={`/product/${product.slug}`}>
-                    <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+                    <img src={(product.images && product.images[0]) || product.primaryImage || '/images/r1.jpg'} alt={product.name} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
                   </Link>
                   <button
                     onClick={() => toggleWishlist(product.id)}
